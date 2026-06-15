@@ -11,23 +11,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ---- Java setup (stable for Flutter Android builds) ----
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
+      # ---- Flutter setup (PINNED VERSION to avoid CI breakage) ----
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.44.2
+          flutter-version: 3.19.6
+          channel: stable
+          cache: true
 
-      - name: Get dependencies
+      # ---- Dependencies ----
+      - name: Install dependencies
         run: flutter pub get
 
+      # ---- Fix Android Gradle + Kotlin compatibility ----
+      - name: Patch Android build config
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g" >> android/gradle.properties || true
+          echo "kotlin.code.style=official" >> android/gradle.properties || true
+
+          # Force safer Kotlin version if file exists
+          if [ -f android/build.gradle ]; then
+            sed -i 's/kotlin_version.*/kotlin_version=1.9.10/' android/build.gradle || true
+          fi
+
+      # ---- Build APK ----
       - name: Build APK (release)
         run: flutter build apk --release
 
+      # ---- Upload APK ----
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
